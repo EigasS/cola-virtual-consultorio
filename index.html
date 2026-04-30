@@ -387,11 +387,39 @@
             align-items: center;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             transition: all 0.3s ease;
+            cursor: grab;
+            position: relative;
+        }
+
+        .queue-item:active {
+            cursor: grabbing;
+        }
+
+        .queue-item.dragging {
+            opacity: 0.5;
+            transform: scale(1.05);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .queue-item.drag-over {
+            border-top: 3px solid #667eea;
         }
 
         .queue-item:hover {
             transform: translateX(5px);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .drag-handle {
+            cursor: grab;
+            font-size: 1.2em;
+            color: #999;
+            margin-right: 10px;
+            user-select: none;
+        }
+
+        .drag-handle:active {
+            cursor: grabbing;
         }
 
         .queue-item-position {
@@ -842,8 +870,10 @@
         let notificationPlayed = false;
         let activeDoctor = null;
         let isAdmin = false;
+        let isDoctor = false;
         let isFlashing = false;
         let currentSecretary = null;
+        let currentDoctorUser = null;
         let secretaryDoctors = [];
         const AVG_CONSULTATION_TIME = 15;
 
@@ -852,6 +882,8 @@
             // Verificar si hay sesión guardada
             const savedSession = localStorage.getItem('adminSession');
             const savedSecretaryId = localStorage.getItem('secretaryId');
+            const savedDoctorSession = localStorage.getItem('doctorSession');
+            const savedDoctorId = localStorage.getItem('doctorId');
             const savedPatientCode = localStorage.getItem('myPatientCode');
 
             if (savedSession === 'active' && savedSecretaryId) {
@@ -862,13 +894,31 @@
 
                     if (secretary) {
                         isAdmin = true;
+                        isDoctor = false;
                         currentSecretary = secretary;
                         secretaryDoctors = secretary.doctors || [];
                         showAdminView();
                     } else {
-                        // Secretaria no encontrada, limpiar sesión
                         localStorage.removeItem('adminSession');
                         localStorage.removeItem('secretaryId');
+                        showLoginOrPatient();
+                    }
+                });
+            } else if (savedDoctorSession === 'active' && savedDoctorId) {
+                // Restaurar sesión de médico
+                waitForFirebase(async () => {
+                    const doctorSnapshot = await window.dbGet(window.dbRef(window.db, `doctors/${savedDoctorId}`));
+                    const doctor = doctorSnapshot.val();
+
+                    if (doctor) {
+                        isDoctor = true;
+                        isAdmin = false;
+                        currentDoctorUser = doctor;
+                        activeDoctor = doctor.id;
+                        showDoctorView();
+                    } else {
+                        localStorage.removeItem('doctorSession');
+                        localStorage.removeItem('doctorId');
                         showLoginOrPatient();
                     }
                 });
@@ -920,6 +970,25 @@
             });
         }
 
+        function showDoctorView() {
+            document.getElementById('loginPanel').style.display = 'none';
+            document.getElementById('mainContainer').style.display = 'block';
+            document.getElementById('adminModeBtn').style.display = 'none';
+            document.getElementById('logoutBtn').style.display = 'block';
+
+            // Mostrar nombre del médico
+            document.getElementById('logoutBtn').textContent = `🚪 Dr. ${currentDoctorUser.name}`;
+
+            // Ocultar selector de paciente
+            document.querySelectorAll('.mode-btn')[0].style.display = 'none';
+
+            waitForFirebase(() => {
+                setupFirebaseListeners();
+                initializeData();
+                switchMode('admin'); // Mostrar panel de administración pero solo lectura
+            });
+        }
+
         async function login(event) {
             event.preventDefault();
             const username = document.getElementById('username').value.trim();
@@ -927,7 +996,7 @@
             const errorMsg = document.getElementById('loginError');
 
             try {
-                // Buscar secretaria en Firebase
+                // Primero buscar en secretarias
                 const secretariesSnapshot = await window.dbGet(window.dbRef(window.db, 'secretaries'));
                 const secretaries = secretariesSnapshot.val() || {};
 
@@ -937,18 +1006,42 @@
 
                 if (secretary) {
                     isAdmin = true;
+                    isDoctor = false;
                     currentSecretary = secretary;
                     secretaryDoctors = secretary.doctors || [];
 
-                    // Guardar sesión
                     localStorage.setItem('adminSession', 'active');
                     localStorage.setItem('secretaryId', secretary.id);
 
                     showAdminView();
-                } else {
-                    errorMsg.classList.add('show');
-                    setTimeout(() => errorMsg.classList.remove('show'), 3000);
+                    return;
                 }
+
+                // Si no es secretaria, buscar en médicos
+                const doctorsSnapshot = await window.dbGet(window.dbRef(window.db, 'doctors'));
+                const doctors = doctorsSnapshot.val() || {};
+
+                const doctor = Object.values(doctors).find(d =>
+                    d.username === username && d.password === password
+                );
+
+                if (doctor) {
+                    isDoctor = true;
+                    isAdmin = false;
+                    currentDoctorUser = doctor;
+                    activeDoctor = doctor.id;
+
+                    localStorage.setItem('doctorSession', 'active');
+                    localStorage.setItem('doctorId', doctor.id);
+
+                    showDoctorView();
+                    return;
+                }
+
+                // Si no es ni secretaria ni médico
+                errorMsg.classList.add('show');
+                setTimeout(() => errorMsg.classList.remove('show'), 3000);
+
             } catch (error) {
                 console.error('Error al autenticar:', error);
                 alert('Error al conectar con el servidor. Intenta nuevamente.');
@@ -956,12 +1049,17 @@
         }
 
         function logout() {
-            if (confirm('¿Cerrar sesión de secretaría?')) {
+            const userType = isAdmin ? 'secretaría' : 'sesión de médico';
+            if (confirm(`¿Cerrar ${userType}?`)) {
                 isAdmin = false;
+                isDoctor = false;
                 currentSecretary = null;
+                currentDoctorUser = null;
                 secretaryDoctors = [];
                 localStorage.removeItem('adminSession');
                 localStorage.removeItem('secretaryId');
+                localStorage.removeItem('doctorSession');
+                localStorage.removeItem('doctorId');
                 location.reload();
             }
         }
@@ -1140,8 +1238,20 @@
 
             if (!snapshot.exists()) {
                 const defaultDoctors = {
-                    '1': { id: '1', name: 'Dr. Juan Pérez', specialty: 'Medicina General' },
-                    '2': { id: '2', name: 'Dra. María González', specialty: 'Cardiología' }
+                    '1': {
+                        id: '1',
+                        name: 'Dr. Juan Pérez',
+                        specialty: 'Medicina General',
+                        username: 'drperez',
+                        password: 'perez123'
+                    },
+                    '2': {
+                        id: '2',
+                        name: 'Dra. María González',
+                        specialty: 'Cardiología',
+                        username: 'drgonzalez',
+                        password: 'gonzalez123'
+                    }
                 };
                 await window.dbSet(doctorsRef, defaultDoctors);
                 activeDoctor = '1';
@@ -1175,13 +1285,18 @@
             const newDoctor = {
                 id: Date.now().toString(),
                 name: name,
-                specialty: specialty || 'Medicina General'
+                specialty: specialty || 'Medicina General',
+                username: '',  // Se configura después manualmente
+                password: ''   // Se configura después manualmente
             };
 
             await window.dbSet(window.dbRef(window.db, `doctors/${newDoctor.id}`), newDoctor);
 
             nameInput.value = '';
             specialtyInput.value = '';
+
+            // Actualizar selectores de médicos
+            await updateDoctorSelectors();
             updateDoctorsList();
         }
 
@@ -1570,7 +1685,8 @@
             const doctorsSnapshot = await window.dbGet(window.dbRef(window.db, `doctors/${activeDoctor}`));
             const activeDoc = doctorsSnapshot.val();
 
-            const filteredQueue = Object.values(queue).filter(p => p.doctorId === activeDoctor);
+            const filteredQueue = Object.values(queue).filter(p => p.doctorId === activeDoctor)
+                .sort((a, b) => (a.order || a.timestamp) - (b.order || b.timestamp));
 
             document.getElementById('totalPatients').textContent = filteredQueue.length;
             document.getElementById('attendedToday').textContent = stats.attendedCount;
@@ -1587,7 +1703,7 @@
                     'Médico no encontrado';
                 currentDoctorEl.textContent = `👨‍⚕️ ${doctorInfo}`;
                 currentNameEl.textContent = `${currentPatient.name} (Código: ${currentPatient.code})`;
-                finishBtn.disabled = false;
+                finishBtn.disabled = false || isDoctor;  // Médicos no pueden finalizar, solo secretarias
             } else if (currentPatient && currentPatient.doctorId !== activeDoctor) {
                 const otherDocSnapshot = await window.dbGet(window.dbRef(window.db, `doctors/${currentPatient.doctorId}`));
                 const otherDoc = otherDocSnapshot.val();
@@ -1612,7 +1728,8 @@
                 `;
             } else {
                 queueListEl.innerHTML = filteredQueue.map((patient, index) => `
-                    <div class="queue-item">
+                    <div class="queue-item" draggable="${isAdmin ? 'true' : 'false'}" data-patient-id="${patient.id}" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="drop(event)" ondragend="dragEnd(event)">
+                        ${isAdmin ? '<span class="drag-handle">☰</span>' : ''}
                         <div class="queue-item-position">${index + 1}</div>
                         <div class="queue-item-info">
                             <div class="queue-item-name">${patient.name}</div>
@@ -1621,19 +1738,94 @@
                             </div>
                         </div>
                         <div class="queue-item-actions">
-                            <button class="btn btn-primary" onclick="resendWhatsApp('${patient.id}')" style="font-size: 0.9em; padding: 8px 16px;">
-                                📱 WhatsApp
-                            </button>
-                            <button class="btn btn-danger" onclick="removePatient('${patient.id}')">
-                                Eliminar
-                            </button>
+                            ${isAdmin ? `
+                                <button class="btn btn-primary" onclick="resendWhatsApp('${patient.id}')" style="font-size: 0.9em; padding: 8px 16px;">
+                                    📱 WhatsApp
+                                </button>
+                                <button class="btn btn-danger" onclick="removePatient('${patient.id}')">
+                                    Eliminar
+                                </button>
+                            ` : ''}
                         </div>
                     </div>
                 `).join('');
             }
 
+            // Deshabilitar botones si es médico (solo vista)
             document.getElementById('callNextBtn').disabled = filteredQueue.length === 0 ||
-                (currentPatient && currentPatient.doctorId === activeDoctor);
+                (currentPatient && currentPatient.doctorId === activeDoctor) || isDoctor;
+
+            // Ocultar controles de secretaria si es médico
+            if (isDoctor) {
+                document.querySelector('.add-patient-form').style.display = 'none';
+                document.querySelector('.admin-controls').style.display = 'none';
+                const doctorSelector = document.querySelector('[style*="background: #f8f9ff"]');
+                if (doctorSelector) doctorSelector.style.display = 'none';
+            }
+        }
+
+        // Funciones de Drag and Drop
+        let draggedElement = null;
+
+        function dragStart(e) {
+            if (!isAdmin) return;
+            draggedElement = e.target.closest('.queue-item');
+            draggedElement.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function dragOver(e) {
+            if (!isAdmin) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+
+            const afterElement = getDragAfterElement(e.currentTarget.parentElement, e.clientY);
+            const dragging = document.querySelector('.dragging');
+
+            if (afterElement == null) {
+                e.currentTarget.parentElement.appendChild(dragging);
+            } else {
+                e.currentTarget.parentElement.insertBefore(dragging, afterElement);
+            }
+        }
+
+        function drop(e) {
+            if (!isAdmin) return;
+            e.preventDefault();
+            saveQueueOrder();
+        }
+
+        function dragEnd(e) {
+            if (!isAdmin) return;
+            e.target.closest('.queue-item').classList.remove('dragging');
+            draggedElement = null;
+        }
+
+        function getDragAfterElement(container, y) {
+            const draggableElements = [...container.querySelectorAll('.queue-item:not(.dragging)')];
+
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+
+                if (offset < 0 && offset > closest.offset) {
+                    return { offset: offset, element: child };
+                } else {
+                    return closest;
+                }
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+
+        async function saveQueueOrder() {
+            const queueItems = document.querySelectorAll('.queue-item');
+            const updates = {};
+
+            queueItems.forEach((item, index) => {
+                const patientId = item.getAttribute('data-patient-id');
+                updates[`queue/${patientId}/order`] = index;
+            });
+
+            await window.dbUpdate(window.dbRef(window.db), updates);
         }
 
         function updateAllDisplays() {
@@ -1733,9 +1925,35 @@
             console.table(Object.values(doctors).map(d => ({
                 ID: d.id,
                 Nombre: d.name,
-                Especialidad: d.specialty
+                Especialidad: d.specialty,
+                Usuario: d.username || 'No configurado',
+                Contraseña: d.password || 'No configurada'
             })));
             return doctors;
+        };
+
+        // Función para agregar credenciales de login a un médico
+        window.setDoctorCredentials = async function (doctorId, username, password) {
+            await window.dbUpdate(window.dbRef(window.db, `doctors/${doctorId}`), {
+                username: username,
+                password: password
+            });
+            console.log('✅ Credenciales actualizadas para médico:', doctorId);
+        };
+
+        // Función para crear un nuevo médico completo
+        window.addDoctorComplete = async function (name, specialty, username, password) {
+            const newDoctor = {
+                id: 'doc' + Date.now(),
+                name: name,
+                specialty: specialty || 'Medicina General',
+                username: username,
+                password: password
+            };
+
+            await window.dbSet(window.dbRef(window.db, `doctors/${newDoctor.id}`), newDoctor);
+            console.log('✅ Médico agregado:', newDoctor);
+            return newDoctor;
         };
 
         // Inicializar secretarias al cargar
