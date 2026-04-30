@@ -1,0 +1,1430 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cola Virtual - Consultorio Médico</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .firebase-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 1000;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #dc3545;
+            animation: pulse-red 2s infinite;
+        }
+
+        .status-dot.connected {
+            background: #28a745;
+            animation: pulse-green 2s infinite;
+        }
+
+        @keyframes pulse-red {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        @keyframes pulse-green {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        .mode-selector {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .mode-btn {
+            padding: 15px 40px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            backdrop-filter: blur(10px);
+        }
+
+        .mode-btn.active {
+            background: white;
+            color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .mode-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .panel {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: none;
+        }
+
+        .panel.active {
+            display: block;
+        }
+
+        .patient-status {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .queue-position {
+            font-size: 6em;
+            font-weight: 700;
+            color: #667eea;
+            margin: 20px 0;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .status-message {
+            font-size: 1.3em;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .patient-info {
+            background: #f8f9ff;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #666;
+        }
+
+        .info-value {
+            color: #333;
+        }
+
+        .alert {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            display: none;
+            animation: pulse 2s infinite;
+        }
+
+        .alert.active {
+            display: block;
+        }
+
+        .alert-text {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #856404;
+            text-align: center;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.02);
+            }
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 5px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+        }
+
+        .current-patient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .current-patient h2 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .current-patient-name {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+        }
+
+        .queue-list {
+            background: #f8f9ff;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .queue-item {
+            background: white;
+            border-radius: 10px;
+            padding: 15px 20px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .queue-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .queue-item-position {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: #667eea;
+            width: 50px;
+        }
+
+        .queue-item-info {
+            flex-grow: 1;
+            margin: 0 20px;
+        }
+
+        .queue-item-name {
+            font-weight: 600;
+            font-size: 1.1em;
+            margin-bottom: 5px;
+        }
+
+        .queue-item-time {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .queue-item-actions button {
+            margin-left: 5px;
+            font-size: 0.9em;
+            padding: 8px 16px;
+        }
+
+        .add-patient-form {
+            background: #f8f9ff;
+            border-radius: 12px;
+            padding: 25px;
+            margin-top: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .empty-queue {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .empty-queue-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+
+        .sound-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1.5em;
+            z-index: 100;
+        }
+
+        .sound-toggle:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .sound-toggle.muted {
+            background: #dc3545;
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .queue-position {
+                font-size: 4em;
+            }
+
+            .mode-selector {
+                flex-direction: column;
+            }
+
+            .queue-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .queue-item-actions {
+                margin-top: 10px;
+                width: 100%;
+            }
+
+            .queue-item-actions button {
+                width: 100%;
+                margin: 5px 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="firebase-status">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Conectando...</span>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1>🏥 Cola Virtual - Consultorio</h1>
+            <p>Sistema de gestión de turnos en tiempo real</p>
+        </div>
+
+        <div class="mode-selector">
+            <button class="mode-btn active" onclick="switchMode('patient')">👤 Vista Paciente</button>
+            <button class="mode-btn" onclick="switchMode('admin')">⚙️ Panel Secretaría</button>
+        </div>
+
+        <!-- Panel Paciente -->
+        <div id="patientPanel" class="panel active">
+            <div id="soundToggle" class="sound-toggle" onclick="toggleSound()" style="display: none;"
+                title="Activar/Desactivar sonido de notificación">
+                <span id="soundIcon">🔔</span>
+            </div>
+
+            <div class="patient-status">
+                <h2>Seguimiento de tu turno</h2>
+                <div id="patientDoctorName"
+                    style="font-size: 1.2em; color: #667eea; font-weight: 600; margin-bottom: 10px;"></div>
+                <div class="queue-position" id="patientPosition">-</div>
+                <div class="status-message" id="statusMessage">
+                    Ingresa tu código de seguimiento
+                </div>
+
+                <div class="alert" id="turnAlert">
+                    <div class="alert-text">🔔 ¡Es tu turno! Por favor, acércate al consultorio</div>
+                </div>
+
+                <div class="patient-info" id="patientInfoBox" style="display: none;">
+                    <div class="info-row">
+                        <span class="info-label">Nombre:</span>
+                        <span class="info-value" id="patientNameDisplay">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Hora de llegada:</span>
+                        <span class="info-value" id="arrivalTime">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Tiempo de espera estimado:</span>
+                        <span class="info-value" id="estimatedWait">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Personas adelante:</span>
+                        <span class="info-value" id="peopleAhead">-</span>
+                    </div>
+                </div>
+
+                <div id="codeForm" style="margin-top: 30px;">
+                    <p style="color: #666; margin-bottom: 15px; text-align: center;">
+                        Ingresa el código de 6 dígitos que recibiste por WhatsApp
+                    </p>
+                    <input type="text" id="patientCodeInput" placeholder="Ej: 123456" maxlength="6"
+                        style="width: 100%; padding: 15px; font-size: 1.5em; border: 2px solid #667eea; border-radius: 10px; margin-bottom: 15px; text-align: center; letter-spacing: 5px;">
+                    <button class="btn btn-primary" onclick="enterWithCode()"
+                        style="width: 100%; padding: 15px; font-size: 1.1em;">
+                        Ver mi turno
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel Administración -->
+        <div id="adminPanel" class="panel">
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-number" id="totalPatients">0</div>
+                    <div class="stat-label">Pacientes en cola</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="attendedToday">0</div>
+                    <div class="stat-label">Atendidos hoy</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="avgWaitTime">0</div>
+                    <div class="stat-label">Tiempo promedio (min)</div>
+                </div>
+            </div>
+
+            <div style="background: #f8f9ff; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0;">👨‍⚕️ Médico Activo</h3>
+                    <button class="btn btn-primary" onclick="showDoctorManager()">
+                        Gestionar Médicos
+                    </button>
+                </div>
+                <select id="activeDoctorSelect" onchange="changeActiveDoctor()"
+                    style="width: 100%; padding: 12px; border: 2px solid #667eea; border-radius: 8px; font-size: 1.1em; font-weight: 600;">
+                    <option value="">Selecciona un médico...</option>
+                </select>
+            </div>
+
+            <div id="doctorManagerModal"
+                style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; overflow-y: auto; padding: 20px;">
+                <div
+                    style="background: white; border-radius: 20px; padding: 40px; max-width: 600px; width: 100%; max-height: 80vh; overflow-y: auto;">
+                    <h2 style="margin-bottom: 20px; color: #667eea;">👨‍⚕️ Gestión de Médicos</h2>
+
+                    <div style="background: #f8f9ff; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+                        <h3 style="margin-bottom: 15px;">Agregar Médico</h3>
+                        <div class="form-group">
+                            <label>Nombre del médico</label>
+                            <input type="text" id="newDoctorName" placeholder="Ej: Dr. Juan Pérez">
+                        </div>
+                        <div class="form-group">
+                            <label>Especialidad (opcional)</label>
+                            <input type="text" id="newDoctorSpecialty" placeholder="Ej: Cardiología">
+                        </div>
+                        <button class="btn btn-primary" onclick="addDoctor()">
+                            ➕ Agregar Médico
+                        </button>
+                    </div>
+
+                    <div>
+                        <h3 style="margin-bottom: 15px;">Médicos Registrados</h3>
+                        <div id="doctorsList"></div>
+                    </div>
+
+                    <button class="btn btn-primary" onclick="closeDoctorManager()"
+                        style="margin-top: 20px; width: 100%;">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+
+            <div class="current-patient" id="currentPatientBox">
+                <h2>Paciente actual</h2>
+                <div style="font-size: 0.9em; opacity: 0.9; margin-bottom: 10px;" id="currentDoctorDisplay"></div>
+                <div class="current-patient-name" id="currentPatientName">
+                    Ningún paciente en atención
+                </div>
+                <button class="btn btn-success" id="finishButton" onclick="finishCurrent()" disabled>
+                    ✓ Finalizar consulta
+                </button>
+            </div>
+
+            <div class="admin-controls" style="margin-bottom: 30px;">
+                <button class="btn btn-primary" onclick="callNext()" id="callNextBtn">
+                    📢 Llamar al siguiente paciente
+                </button>
+                <button class="btn btn-danger" onclick="clearQueue()">
+                    🗑️ Limpiar cola
+                </button>
+            </div>
+
+            <h3 style="margin-bottom: 15px;">Cola de espera</h3>
+            <div class="queue-list" id="queueList">
+                <div class="empty-queue">
+                    <div class="empty-queue-icon">📋</div>
+                    <p>No hay pacientes en la cola</p>
+                </div>
+            </div>
+
+            <div class="add-patient-form">
+                <h3 style="margin-bottom: 20px;">➕ Agregar paciente a la cola</h3>
+                <div class="form-group">
+                    <label>Médico *</label>
+                    <select id="adminDoctorSelect"
+                        style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1em;">
+                        <option value="">Selecciona un médico...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Nombre del paciente *</label>
+                    <input type="text" id="adminPatientName" placeholder="Ej: Juan Pérez">
+                </div>
+                <div class="form-group">
+                    <label>Número de celular (con código de país) *</label>
+                    <input type="tel" id="adminPatientPhone" placeholder="Ej: 5491123456789">
+                    <small style="color: #666; display: block; margin-top: 5px;">
+                        Formato: 549 + código de área sin 0 + número (ej: 5491123456789)
+                    </small>
+                </div>
+                <button class="btn btn-primary" onclick="addPatientAdmin()">
+                    Agregar y enviar link por WhatsApp
+                </button>
+            </div>
+
+            <div id="whatsappModal"
+                style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center;">
+                <div
+                    style="background: white; border-radius: 20px; padding: 40px; max-width: 500px; width: 90%; text-align: center;">
+                    <h2 style="margin-bottom: 20px; color: #667eea;">✅ Paciente agregado</h2>
+                    <div style="background: #f8f9ff; padding: 20px; border-radius: 12px; margin: 20px 0;">
+                        <p style="margin-bottom: 10px;"><strong>Nombre:</strong> <span id="modalPatientName"></span></p>
+                        <p style="margin-bottom: 10px;"><strong>Código:</strong> <span id="modalPatientCode"
+                                style="font-size: 1.5em; color: #667eea; font-weight: 700; letter-spacing: 3px;"></span>
+                        </p>
+                        <p><strong>Posición:</strong> <span id="modalPatientPosition"></span></p>
+                    </div>
+                    <p style="margin: 20px 0; color: #666;">Haz clic en el botón para abrir WhatsApp y enviar el link de
+                        seguimiento:</p>
+                    <a id="whatsappLink" href="#" target="_blank"
+                        style="display: inline-block; background: #25D366; color: white; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 600; margin: 10px 0;">
+                        📱 Abrir WhatsApp
+                    </a>
+                    <br>
+                    <button class="btn btn-primary" onclick="closeModal()" style="margin-top: 15px;">
+                        Cerrar
+                    </button>
+                    <p style="margin-top: 15px; font-size: 0.9em; color: #999;">
+                        También puedes copiar el link manualmente y enviarlo
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PASO 4: REEMPLAZA ESTA CONFIGURACIÓN CON LA TUYA -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getDatabase, ref, set, get, onValue, remove, update } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+
+        // ⚠️ IMPORTANTE: Reemplaza esto con tu configuración de Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyBdtU6EMn7Oz_4kB_YGmNHmVY065C9z3HI",
+            authDomain: "fila-virtual-consultorios.firebaseapp.com",
+            databaseURL: "https://fila-virtual-consultorios-default-rtdb.firebaseio.com",
+            projectId: "fila-virtual-consultorios",
+            storageBucket: "fila-virtual-consultorios.firebasestorage.app",
+            messagingSenderId: "134491897323",
+            appId: "1:134491897323:web:2fc0c7d036bddd2475edae",
+            measurementId: "G-C0G5V5CZ5Z"
+
+        };
+
+        // Inicializar Firebase
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+
+        // Exponer database globalmente
+        window.db = database;
+        window.dbRef = ref;
+        window.dbSet = set;
+        window.dbGet = get;
+        window.dbOnValue = onValue;
+        window.dbRemove = remove;
+        window.dbUpdate = update;
+
+        // Indicador de conexión
+        const connectedRef = ref(database, '.info/connected');
+        onValue(connectedRef, (snapshot) => {
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+
+            if (snapshot.val() === true) {
+                statusDot.classList.add('connected');
+                statusText.textContent = 'Conectado';
+                console.log('✅ Conectado a Firebase');
+            } else {
+                statusDot.classList.remove('connected');
+                statusText.textContent = 'Desconectado';
+                console.log('❌ Desconectado de Firebase');
+            }
+        });
+
+        console.log('🔥 Firebase inicializado');
+        window.firebaseReady = true;
+    </script>
+
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+    <script>
+        // Variables globales
+        let patientCode = null;
+        let soundEnabled = true;
+        let audioContext = null;
+        let notificationPlayed = false;
+        let activeDoctor = null;
+        const AVG_CONSULTATION_TIME = 15;
+
+        // Esperar a que Firebase esté listo
+        function waitForFirebase(callback) {
+            const checkFirebase = setInterval(() => {
+                if (window.firebaseReady) {
+                    clearInterval(checkFirebase);
+                    callback();
+                }
+            }, 100);
+        }
+
+        // Inicializar listeners de Firebase
+        waitForFirebase(() => {
+            console.log('Configurando listeners de Firebase...');
+
+            // Listener para la cola
+            window.dbOnValue(window.dbRef(window.db, 'queue'), (snapshot) => {
+                console.log('📦 Actualización de cola recibida');
+                updateAllDisplays();
+            });
+
+            // Listener para paciente actual
+            window.dbOnValue(window.dbRef(window.db, 'currentPatient'), (snapshot) => {
+                console.log('👤 Actualización de paciente actual');
+                updateAllDisplays();
+            });
+
+            // Listener para médicos
+            window.dbOnValue(window.dbRef(window.db, 'doctors'), (snapshot) => {
+                console.log('👨‍⚕️ Actualización de médicos');
+                updateDoctorSelectors();
+            });
+
+            // Listener para estadísticas
+            window.dbOnValue(window.dbRef(window.db, 'stats'), (snapshot) => {
+                console.log('📊 Actualización de estadísticas');
+                updateAllDisplays();
+            });
+
+            // Cargar médico activo de localStorage
+            const savedActiveDoctor = localStorage.getItem('activeDoctor');
+            if (savedActiveDoctor) {
+                activeDoctor = savedActiveDoctor;
+            }
+
+            // Inicializar datos
+            initializeData();
+            checkUrlParams();
+        });
+
+        // Inicializar datos por defecto
+        async function initializeData() {
+            const doctorsRef = window.dbRef(window.db, 'doctors');
+            const snapshot = await window.dbGet(doctorsRef);
+
+            if (!snapshot.exists()) {
+                const defaultDoctors = {
+                    '1': { id: '1', name: 'Dr. Juan Pérez', specialty: 'Medicina General' },
+                    '2': { id: '2', name: 'Dra. María González', specialty: 'Cardiología' }
+                };
+                await window.dbSet(doctorsRef, defaultDoctors);
+                activeDoctor = '1';
+                localStorage.setItem('activeDoctor', activeDoctor);
+            }
+
+            // Inicializar stats si no existen
+            const statsRef = window.dbRef(window.db, 'stats');
+            const statsSnapshot = await window.dbGet(statsRef);
+            if (!statsSnapshot.exists()) {
+                await window.dbSet(statsRef, {
+                    attendedCount: 0,
+                    totalWaitTime: 0
+                });
+            }
+
+            updateAllDisplays();
+        }
+
+        // Audio
+        function initAudioContext() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            return audioContext;
+        }
+
+        function playNotificationSound() {
+            if (!soundEnabled) return;
+
+            try {
+                const ctx = initAudioContext();
+                const frequencies = [523.25, 659.25, 783.99];
+                const startTime = ctx.currentTime;
+
+                frequencies.forEach((freq, index) => {
+                    const oscillator = ctx.createOscillator();
+                    const gainNode = ctx.createGain();
+
+                    oscillator.connect(gainNode);
+                    gainNode.connect(ctx.destination);
+                    oscillator.frequency.value = freq;
+                    oscillator.type = 'sine';
+
+                    gainNode.gain.setValueAtTime(0, startTime + index * 0.3);
+                    gainNode.gain.linearRampToValueAtTime(0.3, startTime + index * 0.3 + 0.05);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + index * 0.3 + 0.25);
+
+                    oscillator.start(startTime + index * 0.3);
+                    oscillator.stop(startTime + index * 0.3 + 0.3);
+                });
+
+                if ('vibrate' in navigator) {
+                    navigator.vibrate([200, 100, 200, 100, 400]);
+                }
+            } catch (error) {
+                console.log('Error al reproducir sonido:', error);
+            }
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const soundToggle = document.getElementById('soundToggle');
+            const soundIcon = document.getElementById('soundIcon');
+
+            if (soundEnabled) {
+                soundToggle.classList.remove('muted');
+                soundIcon.textContent = '🔔';
+                localStorage.setItem('soundEnabled', 'true');
+                playNotificationSound();
+            } else {
+                soundToggle.classList.add('muted');
+                soundIcon.textContent = '🔕';
+                localStorage.setItem('soundEnabled', 'false');
+            }
+        }
+
+        function loadSoundPreference() {
+            const savedPref = localStorage.getItem('soundEnabled');
+            if (savedPref !== null) {
+                soundEnabled = savedPref === 'true';
+                const soundToggle = document.getElementById('soundToggle');
+                const soundIcon = document.getElementById('soundIcon');
+                if (!soundEnabled && soundToggle) {
+                    soundToggle.classList.add('muted');
+                    soundIcon.textContent = '🔕';
+                }
+            }
+        }
+
+        // Generar código
+        function generateCode() {
+            return Math.floor(100000 + Math.random() * 900000).toString();
+        }
+
+        // Cambiar modo
+        function switchMode(mode) {
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.panel').forEach(panel => panel.classList.remove('active'));
+
+            if (mode === 'patient') {
+                document.querySelectorAll('.mode-btn')[0].classList.add('active');
+                document.getElementById('patientPanel').classList.add('active');
+                updatePatientDisplay();
+            } else {
+                document.querySelectorAll('.mode-btn')[1].classList.add('active');
+                document.getElementById('adminPanel').classList.add('active');
+                updateAdminDisplay();
+            }
+        }
+
+        // Ingresar con código
+        function enterWithCode() {
+            let code = patientCode;
+
+            if (!code) {
+                const codeInput = document.getElementById('patientCodeInput');
+                code = codeInput.value.trim();
+
+                if (!code || code.length !== 6) {
+                    alert('Por favor ingresa un código válido de 6 dígitos');
+                    return;
+                }
+
+                patientCode = code;
+                localStorage.setItem('myPatientCode', patientCode);
+            }
+
+            updatePatientDisplay();
+        }
+
+        // Gestión de médicos
+        async function addDoctor() {
+            const nameInput = document.getElementById('newDoctorName');
+            const specialtyInput = document.getElementById('newDoctorSpecialty');
+
+            const name = nameInput.value.trim();
+            const specialty = specialtyInput.value.trim();
+
+            if (!name) {
+                alert('Por favor ingresa el nombre del médico');
+                return;
+            }
+
+            const newDoctor = {
+                id: Date.now().toString(),
+                name: name,
+                specialty: specialty || 'Medicina General'
+            };
+
+            await window.dbSet(window.dbRef(window.db, `doctors/${newDoctor.id}`), newDoctor);
+
+            nameInput.value = '';
+            specialtyInput.value = '';
+            updateDoctorsList();
+        }
+
+        async function removeDoctor(id) {
+            const doctorsSnapshot = await window.dbGet(window.dbRef(window.db, 'doctors'));
+            const doctors = doctorsSnapshot.val() || {};
+
+            if (Object.keys(doctors).length <= 1) {
+                alert('Debe haber al menos un médico registrado');
+                return;
+            }
+
+            if (confirm('¿Eliminar este médico? Los pacientes en su cola se perderán.')) {
+                await window.dbRemove(window.dbRef(window.db, `doctors/${id}`));
+
+                // Remover pacientes de este médico
+                const queueSnapshot = await window.dbGet(window.dbRef(window.db, 'queue'));
+                const queue = queueSnapshot.val() || {};
+
+                for (const patientId in queue) {
+                    if (queue[patientId].doctorId === id) {
+                        await window.dbRemove(window.dbRef(window.db, `queue/${patientId}`));
+                    }
+                }
+
+                if (activeDoctor === id) {
+                    const remainingDoctors = Object.keys(doctors).filter(d => d !== id);
+                    activeDoctor = remainingDoctors[0];
+                    localStorage.setItem('activeDoctor', activeDoctor);
+                }
+
+                updateDoctorsList();
+            }
+        }
+
+        function changeActiveDoctor() {
+            const select = document.getElementById('activeDoctorSelect');
+            activeDoctor = select.value;
+            localStorage.setItem('activeDoctor', activeDoctor);
+            updateAdminDisplay();
+        }
+
+        async function updateDoctorSelectors() {
+            const doctorsSnapshot = await window.dbGet(window.dbRef(window.db, 'doctors'));
+            const doctors = doctorsSnapshot.val() || {};
+
+            const activeDoctorSelect = document.getElementById('activeDoctorSelect');
+            const adminDoctorSelect = document.getElementById('adminDoctorSelect');
+
+            if (activeDoctorSelect) {
+                activeDoctorSelect.innerHTML = Object.values(doctors).map(d =>
+                    `<option value="${d.id}" ${d.id === activeDoctor ? 'selected' : ''}>
+                        ${d.name}${d.specialty ? ` - ${d.specialty}` : ''}
+                    </option>`
+                ).join('');
+            }
+
+            if (adminDoctorSelect) {
+                adminDoctorSelect.innerHTML = '<option value="">Selecciona un médico...</option>' +
+                    Object.values(doctors).map(d =>
+                        `<option value="${d.id}" ${d.id === activeDoctor ? 'selected' : ''}>
+                            ${d.name}${d.specialty ? ` - ${d.specialty}` : ''}
+                        </option>`
+                    ).join('');
+            }
+        }
+
+        function showDoctorManager() {
+            document.getElementById('doctorManagerModal').style.display = 'flex';
+            updateDoctorsList();
+        }
+
+        function closeDoctorManager() {
+            document.getElementById('doctorManagerModal').style.display = 'none';
+        }
+
+        async function updateDoctorsList() {
+            const doctorsSnapshot = await window.dbGet(window.dbRef(window.db, 'doctors'));
+            const doctors = doctorsSnapshot.val() || {};
+            const listEl = document.getElementById('doctorsList');
+
+            if (Object.keys(doctors).length === 0) {
+                listEl.innerHTML = '<p style="text-align: center; color: #999;">No hay médicos registrados</p>';
+                return;
+            }
+
+            listEl.innerHTML = Object.values(doctors).map(doctor => `
+                <div style="background: white; border-radius: 10px; padding: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <div>
+                        <div style="font-weight: 600; font-size: 1.1em; margin-bottom: 5px;">${doctor.name}</div>
+                        <div style="color: #666; font-size: 0.9em;">${doctor.specialty}</div>
+                    </div>
+                    <button class="btn btn-danger" onclick="removeDoctor('${doctor.id}')" ${Object.keys(doctors).length <= 1 ? 'disabled' : ''}>
+                        Eliminar
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        // Agregar paciente
+        async function addPatientAdmin() {
+            const doctorSelect = document.getElementById('adminDoctorSelect');
+            const nameInput = document.getElementById('adminPatientName');
+            const phoneInput = document.getElementById('adminPatientPhone');
+
+            const doctorId = doctorSelect.value;
+            const name = nameInput.value.trim();
+            const phone = phoneInput.value.trim();
+
+            if (!doctorId) {
+                alert('Por favor selecciona un médico');
+                return;
+            }
+
+            if (!name) {
+                alert('Por favor ingresa el nombre del paciente');
+                return;
+            }
+
+            if (!phone) {
+                alert('Por favor ingresa el número de celular del paciente');
+                return;
+            }
+
+            if (!phone.match(/^549\d{10}$/)) {
+                alert('El número debe tener el formato: 549 + código de área sin 0 + número\nEjemplo: 5491123456789');
+                return;
+            }
+
+            const code = generateCode();
+            const doctorsSnapshot = await window.dbGet(window.dbRef(window.db, `doctors/${doctorId}`));
+            const doctor = doctorsSnapshot.val();
+
+            const newPatient = {
+                id: Date.now().toString(),
+                name: name,
+                phone: phone,
+                code: code,
+                doctorId: doctorId,
+                doctorName: doctor.name,
+                doctorSpecialty: doctor.specialty,
+                arrivalTime: new Date().toLocaleTimeString('es-AR'),
+                timestamp: Date.now()
+            };
+
+            await window.dbSet(window.dbRef(window.db, `queue/${newPatient.id}`), newPatient);
+
+            const queueSnapshot = await window.dbGet(window.dbRef(window.db, 'queue'));
+            const queue = queueSnapshot.val() || {};
+            const doctorQueue = Object.values(queue).filter(p => p.doctorId === doctorId);
+
+            showWhatsAppModal(newPatient, doctorQueue.length);
+
+            nameInput.value = '';
+            phoneInput.value = '';
+        }
+
+        function showWhatsAppModal(patient, position) {
+            const modal = document.getElementById('whatsappModal');
+            const baseUrl = window.location.href.split('?')[0];
+            const trackingUrl = `${baseUrl}?code=${patient.code}`;
+
+            const doctorInfo = patient.doctorSpecialty ?
+                `${patient.doctorName} - ${patient.doctorSpecialty}` :
+                patient.doctorName;
+
+            const message = `Hola ${patient.name}! 👋\n\n` +
+                `Has sido agregado/a a la cola virtual del consultorio.\n\n` +
+                `👨‍⚕️ Médico: *${doctorInfo}*\n` +
+                `🔢 Tu código de seguimiento es: *${patient.code}*\n` +
+                `📍 Posición actual: ${position}\n\n` +
+                `Hacé clic en este link para ver tu turno en tiempo real:\n` +
+                `${trackingUrl}\n\n` +
+                `Te avisaremos cuando sea tu turno. ¡No hace falta esperar en la sala!`;
+
+            const whatsappUrl = `https://wa.me/${patient.phone}?text=${encodeURIComponent(message)}`;
+
+            document.getElementById('modalPatientName').textContent = patient.name;
+            document.getElementById('modalPatientCode').textContent = patient.code;
+            document.getElementById('modalPatientPosition').textContent = position;
+            document.getElementById('whatsappLink').href = whatsappUrl;
+
+            modal.style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('whatsappModal').style.display = 'none';
+        }
+
+        async function resendWhatsApp(patientId) {
+            const patientSnapshot = await window.dbGet(window.dbRef(window.db, `queue/${patientId}`));
+            const patient = patientSnapshot.val();
+            if (!patient) return;
+
+            const queueSnapshot = await window.dbGet(window.dbRef(window.db, 'queue'));
+            const queue = queueSnapshot.val() || {};
+            const doctorQueue = Object.values(queue).filter(p => p.doctorId === patient.doctorId);
+            const position = doctorQueue.findIndex(p => p.id === patientId) + 1;
+
+            showWhatsAppModal(patient, position);
+        }
+
+        // Llamar siguiente
+        async function callNext() {
+            const queueSnapshot = await window.dbGet(window.dbRef(window.db, 'queue'));
+            const queue = queueSnapshot.val() || {};
+            const filteredQueue = Object.values(queue).filter(p => p.doctorId === activeDoctor);
+
+            if (filteredQueue.length === 0) {
+                alert('No hay pacientes en la cola para este médico');
+                return;
+            }
+
+            const currentSnapshot = await window.dbGet(window.dbRef(window.db, 'currentPatient'));
+            const currentPatient = currentSnapshot.val();
+
+            if (currentPatient && currentPatient.doctorId === activeDoctor) {
+                alert('Hay un paciente en atención. Finaliza la consulta primero.');
+                return;
+            }
+
+            const nextPatient = filteredQueue[0];
+            nextPatient.calledTime = Date.now();
+
+            await window.dbSet(window.dbRef(window.db, 'currentPatient'), nextPatient);
+            await window.dbRemove(window.dbRef(window.db, `queue/${nextPatient.id}`));
+        }
+
+        // Finalizar consulta
+        async function finishCurrent() {
+            const currentSnapshot = await window.dbGet(window.dbRef(window.db, 'currentPatient'));
+            const currentPatient = currentSnapshot.val();
+
+            if (!currentPatient) return;
+
+            const waitTime = Math.round((currentPatient.calledTime - currentPatient.timestamp) / 60000);
+
+            const statsSnapshot = await window.dbGet(window.dbRef(window.db, 'stats'));
+            const stats = statsSnapshot.val() || { attendedCount: 0, totalWaitTime: 0 };
+
+            await window.dbSet(window.dbRef(window.db, 'stats'), {
+                attendedCount: stats.attendedCount + 1,
+                totalWaitTime: stats.totalWaitTime + waitTime
+            });
+
+            await window.dbRemove(window.dbRef(window.db, 'currentPatient'));
+        }
+
+        // Limpiar cola
+        async function clearQueue() {
+            if (confirm('¿Estás seguro de limpiar toda la cola?')) {
+                await window.dbRemove(window.dbRef(window.db, 'queue'));
+            }
+        }
+
+        // Eliminar paciente
+        async function removePatient(id) {
+            if (confirm('¿Eliminar este paciente de la cola?')) {
+                await window.dbRemove(window.dbRef(window.db, `queue/${id}`));
+            }
+        }
+
+        // Actualizar displays
+        async function updatePatientDisplay() {
+            const queueSnapshot = await window.dbGet(window.dbRef(window.db, 'queue'));
+            const queue = queueSnapshot.val() || {};
+
+            const currentSnapshot = await window.dbGet(window.dbRef(window.db, 'currentPatient'));
+            const currentPatient = currentSnapshot.val();
+
+            const myPatient = Object.values(queue).find(p => p.code === patientCode) ||
+                (currentPatient && currentPatient.code === patientCode ? currentPatient : null);
+
+            const positionEl = document.getElementById('patientPosition');
+            const statusEl = document.getElementById('statusMessage');
+            const alertEl = document.getElementById('turnAlert');
+            const codeForm = document.getElementById('codeForm');
+            const infoBox = document.getElementById('patientInfoBox');
+            const soundToggle = document.getElementById('soundToggle');
+            const doctorNameEl = document.getElementById('patientDoctorName');
+
+            if (!myPatient) {
+                if (patientCode) {
+                    positionEl.textContent = '✓';
+                    statusEl.textContent = 'Tu turno ya fue atendido o finalizado';
+                    alertEl.classList.remove('active');
+                    codeForm.style.display = 'none';
+                    infoBox.style.display = 'none';
+                    soundToggle.style.display = 'none';
+                    doctorNameEl.textContent = '';
+                    notificationPlayed = false;
+                } else {
+                    positionEl.textContent = '-';
+                    statusEl.textContent = 'Ingresa tu código de seguimiento';
+                    alertEl.classList.remove('active');
+                    codeForm.style.display = 'block';
+                    infoBox.style.display = 'none';
+                    soundToggle.style.display = 'none';
+                    doctorNameEl.textContent = '';
+                    notificationPlayed = false;
+                }
+                return;
+            }
+
+            codeForm.style.display = 'none';
+            infoBox.style.display = 'block';
+            soundToggle.style.display = 'flex';
+
+            const doctorInfo = myPatient.doctorSpecialty ?
+                `👨‍⚕️ ${myPatient.doctorName} - ${myPatient.doctorSpecialty}` :
+                `👨‍⚕️ ${myPatient.doctorName}`;
+            doctorNameEl.textContent = doctorInfo;
+
+            document.getElementById('patientNameDisplay').textContent = myPatient.name;
+            document.getElementById('arrivalTime').textContent = myPatient.arrivalTime;
+
+            const isMyTurn = currentPatient && currentPatient.code === patientCode;
+
+            if (isMyTurn) {
+                positionEl.textContent = '🔔';
+                statusEl.textContent = '¡Es tu turno! Dirígete al consultorio';
+                alertEl.classList.add('active');
+                document.getElementById('peopleAhead').textContent = '0';
+                document.getElementById('estimatedWait').textContent = 'Ahora';
+
+                if (!notificationPlayed) {
+                    playNotificationSound();
+                    notificationPlayed = true;
+
+                    if ('Notification' in window && Notification.permission === 'granted') {
+                        new Notification('¡Es tu turno!', {
+                            body: `${myPatient.doctorName} - Por favor, acércate al consultorio`,
+                            icon: '🏥',
+                            vibrate: [200, 100, 200, 100, 400]
+                        });
+                    } else if ('Notification' in window && Notification.permission !== 'denied') {
+                        Notification.requestPermission().then(permission => {
+                            if (permission === 'granted') {
+                                new Notification('¡Es tu turno!', {
+                                    body: `${myPatient.doctorName} - Por favor, acércate al consultorio`,
+                                    icon: '🏥',
+                                    vibrate: [200, 100, 200, 100, 400]
+                                });
+                            }
+                        });
+                    }
+                }
+            } else {
+                notificationPlayed = false;
+                const doctorQueue = Object.values(queue).filter(p => p.doctorId === myPatient.doctorId);
+                const position = doctorQueue.findIndex(p => p.code === patientCode) + 1;
+
+                positionEl.textContent = position;
+                document.getElementById('peopleAhead').textContent = position - 1;
+
+                const estimatedMinutes = (position - 1) * AVG_CONSULTATION_TIME;
+                document.getElementById('estimatedWait').textContent =
+                    estimatedMinutes > 0 ? `~${estimatedMinutes} minutos` : 'Próximo en la fila';
+
+                const currentDoctorPatient = currentPatient && currentPatient.doctorId === myPatient.doctorId;
+
+                if (position === 1 && !currentDoctorPatient) {
+                    statusEl.textContent = '¡Eres el siguiente! Prepárate para ser llamado';
+                    alertEl.classList.add('active');
+                } else if (position <= 3) {
+                    statusEl.textContent = 'Estás cerca. Permanece atento';
+                    alertEl.classList.remove('active');
+                } else {
+                    statusEl.textContent = `Hay ${position - 1} personas delante de ti`;
+                    alertEl.classList.remove('active');
+                }
+            }
+        }
+
+        async function updateAdminDisplay() {
+            const queueSnapshot = await window.dbGet(window.dbRef(window.db, 'queue'));
+            const queue = queueSnapshot.val() || {};
+
+            const currentSnapshot = await window.dbGet(window.dbRef(window.db, 'currentPatient'));
+            const currentPatient = currentSnapshot.val();
+
+            const statsSnapshot = await window.dbGet(window.dbRef(window.db, 'stats'));
+            const stats = statsSnapshot.val() || { attendedCount: 0, totalWaitTime: 0 };
+
+            const doctorsSnapshot = await window.dbGet(window.dbRef(window.db, `doctors/${activeDoctor}`));
+            const activeDoc = doctorsSnapshot.val();
+
+            const filteredQueue = Object.values(queue).filter(p => p.doctorId === activeDoctor);
+
+            document.getElementById('totalPatients').textContent = filteredQueue.length;
+            document.getElementById('attendedToday').textContent = stats.attendedCount;
+            document.getElementById('avgWaitTime').textContent =
+                stats.attendedCount > 0 ? Math.round(stats.totalWaitTime / stats.attendedCount) : 0;
+
+            const currentNameEl = document.getElementById('currentPatientName');
+            const currentDoctorEl = document.getElementById('currentDoctorDisplay');
+            const finishBtn = document.getElementById('finishButton');
+
+            if (currentPatient && currentPatient.doctorId === activeDoctor) {
+                const doctorInfo = activeDoc ?
+                    (activeDoc.specialty ? `${activeDoc.name} - ${activeDoc.specialty}` : activeDoc.name) :
+                    'Médico no encontrado';
+                currentDoctorEl.textContent = `👨‍⚕️ ${doctorInfo}`;
+                currentNameEl.textContent = `${currentPatient.name} (Código: ${currentPatient.code})`;
+                finishBtn.disabled = false;
+            } else if (currentPatient && currentPatient.doctorId !== activeDoctor) {
+                const otherDocSnapshot = await window.dbGet(window.dbRef(window.db, `doctors/${currentPatient.doctorId}`));
+                const otherDoc = otherDocSnapshot.val();
+                const otherDoctorInfo = otherDoc ? otherDoc.name : 'Otro médico';
+                currentDoctorEl.textContent = '';
+                currentNameEl.textContent = `${currentPatient.name} está con ${otherDoctorInfo}`;
+                finishBtn.disabled = true;
+            } else {
+                currentDoctorEl.textContent = '';
+                currentNameEl.textContent = 'Ningún paciente en atención';
+                finishBtn.disabled = true;
+            }
+
+            const queueListEl = document.getElementById('queueList');
+
+            if (filteredQueue.length === 0) {
+                queueListEl.innerHTML = `
+                    <div class="empty-queue">
+                        <div class="empty-queue-icon">📋</div>
+                        <p>No hay pacientes en la cola para este médico</p>
+                    </div>
+                `;
+            } else {
+                queueListEl.innerHTML = filteredQueue.map((patient, index) => `
+                    <div class="queue-item">
+                        <div class="queue-item-position">${index + 1}</div>
+                        <div class="queue-item-info">
+                            <div class="queue-item-name">${patient.name}</div>
+                            <div class="queue-item-time">
+                                Código: <strong>${patient.code}</strong> | Llegada: ${patient.arrivalTime}
+                            </div>
+                        </div>
+                        <div class="queue-item-actions">
+                            <button class="btn btn-primary" onclick="resendWhatsApp('${patient.id}')" style="font-size: 0.9em; padding: 8px 16px;">
+                                📱 WhatsApp
+                            </button>
+                            <button class="btn btn-danger" onclick="removePatient('${patient.id}')">
+                                Eliminar
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            document.getElementById('callNextBtn').disabled = filteredQueue.length === 0 ||
+                (currentPatient && currentPatient.doctorId === activeDoctor);
+        }
+
+        function updateAllDisplays() {
+            updatePatientDisplay();
+            updateAdminDisplay();
+        }
+
+        function checkUrlParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const codeFromUrl = urlParams.get('code');
+
+            if (codeFromUrl) {
+                patientCode = codeFromUrl;
+                localStorage.setItem('myPatientCode', patientCode);
+                document.getElementById('patientCodeInput').value = codeFromUrl;
+                switchMode('patient');
+                enterWithCode();
+            }
+        }
+
+        // Inicialización
+        loadSoundPreference();
+
+        const savedPatientCode = localStorage.getItem('myPatientCode');
+        if (savedPatientCode) {
+            patientCode = savedPatientCode;
+            enterWithCode();
+        }
+    </script>
+</body>
+
+</html>
