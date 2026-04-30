@@ -88,6 +88,71 @@
             }
         }
 
+        /* Login Secretaria */
+        .login-panel {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 400px;
+            margin: 100px auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .login-panel h2 {
+            text-align: center;
+            color: #667eea;
+            margin-bottom: 30px;
+        }
+
+        .login-form input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            margin-bottom: 15px;
+        }
+
+        .login-form input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .logout-btn {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: white;
+            color: #dc3545;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            border: 2px solid #dc3545;
+            z-index: 1000;
+            display: none;
+        }
+
+        .logout-btn:hover {
+            background: #dc3545;
+            color: white;
+        }
+
         .mode-selector {
             display: flex;
             justify-content: center;
@@ -129,6 +194,41 @@
 
         .panel.active {
             display: block;
+        }
+
+        /* Animación de destello rojo */
+        @keyframes red-flash {
+
+            0%,
+            100% {
+                background: white;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            }
+
+            50% {
+                background: #ff0000;
+                box-shadow: 0 0 50px rgba(255, 0, 0, 0.8), 0 20px 60px rgba(255, 0, 0, 0.5);
+            }
+        }
+
+        .panel.flashing {
+            animation: red-flash 1s infinite;
+        }
+
+        .panel.flashing * {
+            animation: text-flash 1s infinite;
+        }
+
+        @keyframes text-flash {
+
+            0%,
+            100% {
+                color: inherit;
+            }
+
+            50% {
+                color: white;
+            }
         }
 
         .patient-status {
@@ -459,15 +559,35 @@
         <span id="statusText">Conectando...</span>
     </div>
 
-    <div class="container">
+    <button class="logout-btn" id="logoutBtn" onclick="logout()">🚪 Cerrar Sesión</button>
+
+    <!-- Panel de Login -->
+    <div id="loginPanel" class="login-panel" style="display: none;">
+        <h2>🔐 Acceso Secretaría</h2>
+        <div class="error-message" id="loginError">Usuario o contraseña incorrectos</div>
+        <form class="login-form" onsubmit="login(event)">
+            <input type="text" id="username" placeholder="Usuario" required autocomplete="username">
+            <input type="password" id="password" placeholder="Contraseña" required autocomplete="current-password">
+            <button type="submit" class="btn btn-primary" style="width: 100%; padding: 15px;">
+                Ingresar
+            </button>
+        </form>
+        <p style="text-align: center; margin-top: 20px; color: #666; font-size: 0.9em;">
+            ¿Eres paciente? <a href="#" onclick="showPatientView(); return false;" style="color: #667eea;">Ingresa tu
+                código aquí</a>
+        </p>
+    </div>
+
+    <div class="container" id="mainContainer" style="display: none;">
         <div class="header">
             <h1>🏥 Cola Virtual - Consultorio</h1>
             <p>Sistema de gestión de turnos en tiempo real</p>
         </div>
 
-        <div class="mode-selector">
+        <div class="mode-selector" id="modeSelector">
             <button class="mode-btn active" onclick="switchMode('patient')">👤 Vista Paciente</button>
-            <button class="mode-btn" onclick="switchMode('admin')">⚙️ Panel Secretaría</button>
+            <button class="mode-btn" onclick="switchMode('admin')" id="adminModeBtn" style="display: none;">⚙️ Panel
+                Secretaría</button>
         </div>
 
         <!-- Panel Paciente -->
@@ -669,12 +789,12 @@
         </div>
     </div>
 
-    <!-- PASO 4: REEMPLAZA ESTA CONFIGURACIÓN CON LA TUYA -->
+    <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
         import { getDatabase, ref, set, get, onValue, remove, update } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
 
-        // ⚠️ IMPORTANTE: Reemplaza esto con tu configuración de Firebase
+        // ⚠️ REEMPLAZA ESTO CON TU CONFIGURACIÓN DE FIREBASE
         const firebaseConfig = {
             apiKey: "AIzaSyBdtU6EMn7Oz_4kB_YGmNHmVY065C9z3HI",
             authDomain: "fila-virtual-consultorios.firebaseapp.com",
@@ -687,11 +807,9 @@
 
         };
 
-        // Inicializar Firebase
         const app = initializeApp(firebaseConfig);
         const database = getDatabase(app);
 
-        // Exponer database globalmente
         window.db = database;
         window.dbRef = ref;
         window.dbSet = set;
@@ -700,7 +818,6 @@
         window.dbRemove = remove;
         window.dbUpdate = update;
 
-        // Indicador de conexión
         const connectedRef = ref(database, '.info/connected');
         onValue(connectedRef, (snapshot) => {
             const statusDot = document.getElementById('statusDot');
@@ -709,105 +826,177 @@
             if (snapshot.val() === true) {
                 statusDot.classList.add('connected');
                 statusText.textContent = 'Conectado';
-                console.log('✅ Conectado a Firebase');
             } else {
                 statusDot.classList.remove('connected');
                 statusText.textContent = 'Desconectado';
-                console.log('❌ Desconectado de Firebase');
             }
         });
 
-        console.log('🔥 Firebase inicializado');
         window.firebaseReady = true;
     </script>
 
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-
     <script>
-        // Variables globales
         let patientCode = null;
         let soundEnabled = true;
         let audioContext = null;
         let notificationPlayed = false;
         let activeDoctor = null;
+        let isAdmin = false;
+        let isFlashing = false;
+        let currentSecretary = null;
+        let secretaryDoctors = [];
         const AVG_CONSULTATION_TIME = 15;
 
-        // Esperar a que Firebase esté listo
-        function waitForFirebase(callback) {
-            const checkFirebase = setInterval(() => {
-                if (window.firebaseReady) {
-                    clearInterval(checkFirebase);
-                    callback();
-                }
-            }, 100);
+        // Inicialización
+        async function initApp() {
+            // Verificar si hay sesión guardada
+            const savedSession = localStorage.getItem('adminSession');
+            const savedSecretaryId = localStorage.getItem('secretaryId');
+            const savedPatientCode = localStorage.getItem('myPatientCode');
+
+            if (savedSession === 'active' && savedSecretaryId) {
+                // Restaurar sesión de secretaria
+                waitForFirebase(async () => {
+                    const secretarySnapshot = await window.dbGet(window.dbRef(window.db, `secretaries/${savedSecretaryId}`));
+                    const secretary = secretarySnapshot.val();
+
+                    if (secretary) {
+                        isAdmin = true;
+                        currentSecretary = secretary;
+                        secretaryDoctors = secretary.doctors || [];
+                        showAdminView();
+                    } else {
+                        // Secretaria no encontrada, limpiar sesión
+                        localStorage.removeItem('adminSession');
+                        localStorage.removeItem('secretaryId');
+                        showLoginOrPatient();
+                    }
+                });
+            } else if (savedPatientCode) {
+                patientCode = savedPatientCode;
+                showPatientView();
+                enterWithCode();
+            } else {
+                showLoginOrPatient();
+            }
+
+            // Solicitar permiso para notificaciones
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
         }
 
-        // Inicializar listeners de Firebase
-        waitForFirebase(() => {
-            console.log('Configurando listeners de Firebase...');
+        function showLoginOrPatient() {
+            document.getElementById('loginPanel').style.display = 'block';
+            document.getElementById('mainContainer').style.display = 'none';
+        }
 
-            // Listener para la cola
-            window.dbOnValue(window.dbRef(window.db, 'queue'), (snapshot) => {
-                console.log('📦 Actualización de cola recibida');
-                updateAllDisplays();
+        function showPatientView() {
+            document.getElementById('loginPanel').style.display = 'none';
+            document.getElementById('mainContainer').style.display = 'block';
+            document.getElementById('adminModeBtn').style.display = 'none';
+            document.getElementById('logoutBtn').style.display = 'none';
+            switchMode('patient');
+
+            waitForFirebase(() => {
+                setupFirebaseListeners();
+                initializeData();
+                checkUrlParams();
             });
+        }
 
-            // Listener para paciente actual
-            window.dbOnValue(window.dbRef(window.db, 'currentPatient'), (snapshot) => {
-                console.log('👤 Actualización de paciente actual');
-                updateAllDisplays();
+        function showAdminView() {
+            document.getElementById('loginPanel').style.display = 'none';
+            document.getElementById('mainContainer').style.display = 'block';
+            document.getElementById('adminModeBtn').style.display = 'inline-block';
+            document.getElementById('logoutBtn').style.display = 'block';
+
+            // Mostrar nombre de la secretaria
+            document.getElementById('logoutBtn').textContent = `🚪 ${currentSecretary.name}`;
+
+            waitForFirebase(() => {
+                setupFirebaseListeners();
+                initializeData();
             });
+        }
 
-            // Listener para médicos
-            window.dbOnValue(window.dbRef(window.db, 'doctors'), (snapshot) => {
-                console.log('👨‍⚕️ Actualización de médicos');
-                updateDoctorSelectors();
-            });
+        async function login(event) {
+            event.preventDefault();
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const errorMsg = document.getElementById('loginError');
 
-            // Listener para estadísticas
-            window.dbOnValue(window.dbRef(window.db, 'stats'), (snapshot) => {
-                console.log('📊 Actualización de estadísticas');
-                updateAllDisplays();
-            });
+            try {
+                // Buscar secretaria en Firebase
+                const secretariesSnapshot = await window.dbGet(window.dbRef(window.db, 'secretaries'));
+                const secretaries = secretariesSnapshot.val() || {};
 
-            // Cargar médico activo de localStorage
-            const savedActiveDoctor = localStorage.getItem('activeDoctor');
-            if (savedActiveDoctor) {
-                activeDoctor = savedActiveDoctor;
+                const secretary = Object.values(secretaries).find(s =>
+                    s.username === username && s.password === password
+                );
+
+                if (secretary) {
+                    isAdmin = true;
+                    currentSecretary = secretary;
+                    secretaryDoctors = secretary.doctors || [];
+
+                    // Guardar sesión
+                    localStorage.setItem('adminSession', 'active');
+                    localStorage.setItem('secretaryId', secretary.id);
+
+                    showAdminView();
+                } else {
+                    errorMsg.classList.add('show');
+                    setTimeout(() => errorMsg.classList.remove('show'), 3000);
+                }
+            } catch (error) {
+                console.error('Error al autenticar:', error);
+                alert('Error al conectar con el servidor. Intenta nuevamente.');
             }
+        }
 
-            // Inicializar datos
-            initializeData();
-            checkUrlParams();
-        });
-
-        // Inicializar datos por defecto
-        async function initializeData() {
-            const doctorsRef = window.dbRef(window.db, 'doctors');
-            const snapshot = await window.dbGet(doctorsRef);
-
-            if (!snapshot.exists()) {
-                const defaultDoctors = {
-                    '1': { id: '1', name: 'Dr. Juan Pérez', specialty: 'Medicina General' },
-                    '2': { id: '2', name: 'Dra. María González', specialty: 'Cardiología' }
-                };
-                await window.dbSet(doctorsRef, defaultDoctors);
-                activeDoctor = '1';
-                localStorage.setItem('activeDoctor', activeDoctor);
+        function logout() {
+            if (confirm('¿Cerrar sesión de secretaría?')) {
+                isAdmin = false;
+                currentSecretary = null;
+                secretaryDoctors = [];
+                localStorage.removeItem('adminSession');
+                localStorage.removeItem('secretaryId');
+                location.reload();
             }
+        }
 
-            // Inicializar stats si no existen
-            const statsRef = window.dbRef(window.db, 'stats');
-            const statsSnapshot = await window.dbGet(statsRef);
-            if (!statsSnapshot.exists()) {
-                await window.dbSet(statsRef, {
-                    attendedCount: 0,
-                    totalWaitTime: 0
+        // Notificaciones push
+        function sendPushNotification(title, body) {
+            if ('Notification' in window && Notification.permission === 'granted') {
+                const notification = new Notification(title, {
+                    body: body,
+                    icon: '🏥',
+                    badge: '🔔',
+                    vibrate: [200, 100, 200, 100, 400],
+                    requireInteraction: true,
+                    tag: 'turn-notification'
                 });
-            }
 
-            updateAllDisplays();
+                notification.onclick = function () {
+                    window.focus();
+                    notification.close();
+                };
+            }
+        }
+
+        // Destellos rojos
+        function startFlashing() {
+            if (isFlashing) return;
+            isFlashing = true;
+            const panel = document.getElementById('patientPanel');
+            panel.classList.add('flashing');
+        }
+
+        function stopFlashing() {
+            isFlashing = false;
+            const panel = document.getElementById('patientPanel');
+            panel.classList.remove('flashing');
         }
 
         // Audio
@@ -881,12 +1070,10 @@
             }
         }
 
-        // Generar código
         function generateCode() {
             return Math.floor(100000 + Math.random() * 900000).toString();
         }
 
-        // Cambiar modo
         function switchMode(mode) {
             document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
             document.querySelectorAll('.panel').forEach(panel => panel.classList.remove('active'));
@@ -896,13 +1083,16 @@
                 document.getElementById('patientPanel').classList.add('active');
                 updatePatientDisplay();
             } else {
-                document.querySelectorAll('.mode-btn')[1].classList.add('active');
+                if (!isAdmin) {
+                    alert('Acceso denegado. Solo la secretaria puede acceder a este panel.');
+                    return;
+                }
+                document.getElementById('adminModeBtn').classList.add('active');
                 document.getElementById('adminPanel').classList.add('active');
                 updateAdminDisplay();
             }
         }
 
-        // Ingresar con código
         function enterWithCode() {
             let code = patientCode;
 
@@ -922,7 +1112,54 @@
             updatePatientDisplay();
         }
 
-        // Gestión de médicos
+        // Firebase
+        function waitForFirebase(callback) {
+            const checkFirebase = setInterval(() => {
+                if (window.firebaseReady) {
+                    clearInterval(checkFirebase);
+                    callback();
+                }
+            }, 100);
+        }
+
+        function setupFirebaseListeners() {
+            window.dbOnValue(window.dbRef(window.db, 'queue'), () => updateAllDisplays());
+            window.dbOnValue(window.dbRef(window.db, 'currentPatient'), () => updateAllDisplays());
+            window.dbOnValue(window.dbRef(window.db, 'doctors'), () => updateDoctorSelectors());
+            window.dbOnValue(window.dbRef(window.db, 'stats'), () => updateAllDisplays());
+
+            const savedActiveDoctor = localStorage.getItem('activeDoctor');
+            if (savedActiveDoctor) {
+                activeDoctor = savedActiveDoctor;
+            }
+        }
+
+        async function initializeData() {
+            const doctorsRef = window.dbRef(window.db, 'doctors');
+            const snapshot = await window.dbGet(doctorsRef);
+
+            if (!snapshot.exists()) {
+                const defaultDoctors = {
+                    '1': { id: '1', name: 'Dr. Juan Pérez', specialty: 'Medicina General' },
+                    '2': { id: '2', name: 'Dra. María González', specialty: 'Cardiología' }
+                };
+                await window.dbSet(doctorsRef, defaultDoctors);
+                activeDoctor = '1';
+                localStorage.setItem('activeDoctor', activeDoctor);
+            }
+
+            const statsRef = window.dbRef(window.db, 'stats');
+            const statsSnapshot = await window.dbGet(statsRef);
+            if (!statsSnapshot.exists()) {
+                await window.dbSet(statsRef, {
+                    attendedCount: 0,
+                    totalWaitTime: 0
+                });
+            }
+
+            updateAllDisplays();
+        }
+
         async function addDoctor() {
             const nameInput = document.getElementById('newDoctorName');
             const specialtyInput = document.getElementById('newDoctorSpecialty');
@@ -960,7 +1197,6 @@
             if (confirm('¿Eliminar este médico? Los pacientes en su cola se perderán.')) {
                 await window.dbRemove(window.dbRef(window.db, `doctors/${id}`));
 
-                // Remover pacientes de este médico
                 const queueSnapshot = await window.dbGet(window.dbRef(window.db, 'queue'));
                 const queue = queueSnapshot.val() || {};
 
@@ -989,7 +1225,15 @@
 
         async function updateDoctorSelectors() {
             const doctorsSnapshot = await window.dbGet(window.dbRef(window.db, 'doctors'));
-            const doctors = doctorsSnapshot.val() || {};
+            const allDoctors = doctorsSnapshot.val() || {};
+
+            // Filtrar solo los médicos asignados a esta secretaria
+            let doctors = allDoctors;
+            if (isAdmin && secretaryDoctors.length > 0) {
+                doctors = Object.values(allDoctors)
+                    .filter(d => secretaryDoctors.includes(d.id))
+                    .reduce((acc, d) => ({ ...acc, [d.id]: d }), {});
+            }
 
             const activeDoctorSelect = document.getElementById('activeDoctorSelect');
             const adminDoctorSelect = document.getElementById('adminDoctorSelect');
@@ -1000,6 +1244,13 @@
                         ${d.name}${d.specialty ? ` - ${d.specialty}` : ''}
                     </option>`
                 ).join('');
+
+                // Si el médico activo no está en la lista, seleccionar el primero
+                if (isAdmin && !doctors[activeDoctor] && Object.keys(doctors).length > 0) {
+                    activeDoctor = Object.keys(doctors)[0];
+                    localStorage.setItem('activeDoctor', activeDoctor);
+                    activeDoctorSelect.value = activeDoctor;
+                }
             }
 
             if (adminDoctorSelect) {
@@ -1044,7 +1295,6 @@
             `).join('');
         }
 
-        // Agregar paciente
         async function addPatientAdmin() {
             const doctorSelect = document.getElementById('adminDoctorSelect');
             const nameInput = document.getElementById('adminPatientName');
@@ -1147,7 +1397,6 @@
             showWhatsAppModal(patient, position);
         }
 
-        // Llamar siguiente
         async function callNext() {
             const queueSnapshot = await window.dbGet(window.dbRef(window.db, 'queue'));
             const queue = queueSnapshot.val() || {};
@@ -1173,7 +1422,6 @@
             await window.dbRemove(window.dbRef(window.db, `queue/${nextPatient.id}`));
         }
 
-        // Finalizar consulta
         async function finishCurrent() {
             const currentSnapshot = await window.dbGet(window.dbRef(window.db, 'currentPatient'));
             const currentPatient = currentSnapshot.val();
@@ -1193,21 +1441,18 @@
             await window.dbRemove(window.dbRef(window.db, 'currentPatient'));
         }
 
-        // Limpiar cola
         async function clearQueue() {
             if (confirm('¿Estás seguro de limpiar toda la cola?')) {
                 await window.dbRemove(window.dbRef(window.db, 'queue'));
             }
         }
 
-        // Eliminar paciente
         async function removePatient(id) {
             if (confirm('¿Eliminar este paciente de la cola?')) {
                 await window.dbRemove(window.dbRef(window.db, `queue/${id}`));
             }
         }
 
-        // Actualizar displays
         async function updatePatientDisplay() {
             const queueSnapshot = await window.dbGet(window.dbRef(window.db, 'queue'));
             const queue = queueSnapshot.val() || {};
@@ -1227,6 +1472,7 @@
             const doctorNameEl = document.getElementById('patientDoctorName');
 
             if (!myPatient) {
+                stopFlashing();
                 if (patientCode) {
                     positionEl.textContent = '✓';
                     statusEl.textContent = 'Tu turno ya fue atendido o finalizado';
@@ -1270,29 +1516,21 @@
                 document.getElementById('peopleAhead').textContent = '0';
                 document.getElementById('estimatedWait').textContent = 'Ahora';
 
+                // ACTIVAR DESTELLOS ROJOS
+                startFlashing();
+
                 if (!notificationPlayed) {
                     playNotificationSound();
                     notificationPlayed = true;
 
-                    if ('Notification' in window && Notification.permission === 'granted') {
-                        new Notification('¡Es tu turno!', {
-                            body: `${myPatient.doctorName} - Por favor, acércate al consultorio`,
-                            icon: '🏥',
-                            vibrate: [200, 100, 200, 100, 400]
-                        });
-                    } else if ('Notification' in window && Notification.permission !== 'denied') {
-                        Notification.requestPermission().then(permission => {
-                            if (permission === 'granted') {
-                                new Notification('¡Es tu turno!', {
-                                    body: `${myPatient.doctorName} - Por favor, acércate al consultorio`,
-                                    icon: '🏥',
-                                    vibrate: [200, 100, 200, 100, 400]
-                                });
-                            }
-                        });
-                    }
+                    // NOTIFICACIÓN PUSH
+                    sendPushNotification(
+                        '🔔 ¡Es tu turno!',
+                        `${myPatient.doctorName} - Por favor, acércate al consultorio`
+                    );
                 }
             } else {
+                stopFlashing();
                 notificationPlayed = false;
                 const doctorQueue = Object.values(queue).filter(p => p.doctorId === myPatient.doctorId);
                 const position = doctorQueue.findIndex(p => p.code === patientCode) + 1;
@@ -1400,7 +1638,9 @@
 
         function updateAllDisplays() {
             updatePatientDisplay();
-            updateAdminDisplay();
+            if (isAdmin) {
+                updateAdminDisplay();
+            }
         }
 
         function checkUrlParams() {
@@ -1411,19 +1651,101 @@
                 patientCode = codeFromUrl;
                 localStorage.setItem('myPatientCode', patientCode);
                 document.getElementById('patientCodeInput').value = codeFromUrl;
-                switchMode('patient');
+                showPatientView();
                 enterWithCode();
             }
         }
 
-        // Inicialización
-        loadSoundPreference();
+        // ========================================
+        // GESTIÓN DE SECRETARIAS (Solo para configuración inicial)
+        // ========================================
 
-        const savedPatientCode = localStorage.getItem('myPatientCode');
-        if (savedPatientCode) {
-            patientCode = savedPatientCode;
-            enterWithCode();
+        // Función de inicialización de secretarias (ejecutar una sola vez)
+        async function initSecretaries() {
+            const secretariesRef = window.dbRef(window.db, 'secretaries');
+            const snapshot = await window.dbGet(secretariesRef);
+
+            if (!snapshot.exists()) {
+                // Crear secretarias de ejemplo
+                const defaultSecretaries = {
+                    'sec1': {
+                        id: 'sec1',
+                        name: 'María García',
+                        username: 'maria',
+                        password: 'maria123',
+                        doctors: ['1']  // ID del Dr. Juan Pérez
+                    },
+                    'sec2': {
+                        id: 'sec2',
+                        name: 'Laura Rodríguez',
+                        username: 'laura',
+                        password: 'laura123',
+                        doctors: ['2']  // ID de la Dra. María González
+                    }
+                };
+
+                await window.dbSet(secretariesRef, defaultSecretaries);
+                console.log('✅ Secretarias inicializadas');
+            }
         }
+
+        // Función para agregar una nueva secretaria (uso manual desde consola)
+        window.addSecretary = async function (name, username, password, doctorIds) {
+            const newSecretary = {
+                id: 'sec' + Date.now(),
+                name: name,
+                username: username,
+                password: password,
+                doctors: doctorIds || []
+            };
+
+            await window.dbSet(window.dbRef(window.db, `secretaries/${newSecretary.id}`), newSecretary);
+            console.log('✅ Secretaria agregada:', newSecretary);
+            return newSecretary;
+        };
+
+        // Función para listar secretarias (uso manual desde consola)
+        window.listSecretaries = async function () {
+            const secretariesSnapshot = await window.dbGet(window.dbRef(window.db, 'secretaries'));
+            const secretaries = secretariesSnapshot.val() || {};
+            console.table(Object.values(secretaries).map(s => ({
+                ID: s.id,
+                Nombre: s.name,
+                Usuario: s.username,
+                Contraseña: s.password,
+                Médicos: s.doctors.join(', ')
+            })));
+            return secretaries;
+        };
+
+        // Función para actualizar médicos asignados a una secretaria
+        window.updateSecretaryDoctors = async function (secretaryId, doctorIds) {
+            await window.dbUpdate(window.dbRef(window.db, `secretaries/${secretaryId}`), {
+                doctors: doctorIds
+            });
+            console.log('✅ Médicos actualizados para secretaria:', secretaryId);
+        };
+
+        // Función para listar médicos (uso manual desde consola)
+        window.listDoctors = async function () {
+            const doctorsSnapshot = await window.dbGet(window.dbRef(window.db, 'doctors'));
+            const doctors = doctorsSnapshot.val() || {};
+            console.table(Object.values(doctors).map(d => ({
+                ID: d.id,
+                Nombre: d.name,
+                Especialidad: d.specialty
+            })));
+            return doctors;
+        };
+
+        // Inicializar secretarias al cargar
+        waitForFirebase(() => {
+            initSecretaries();
+        });
+
+        // Inicializar app
+        loadSoundPreference();
+        initApp();
     </script>
 </body>
 
